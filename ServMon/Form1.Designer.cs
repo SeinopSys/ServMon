@@ -258,6 +258,7 @@
 			this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Text = "ServMon";
+			this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SettingsForm_FormClosing);
 			this.LGroupBox.ResumeLayout(false);
 			this.LGroupBox.PerformLayout();
 			this.RGroupBox.ResumeLayout(false);

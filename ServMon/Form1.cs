@@ -225,8 +225,15 @@ namespace ServMon {
 			rAuto = RAutoStart.Checked ? "true" : "";
 			AppSettings.Set("rightServiceAutostart", rAuto);
 		}
+		private bool cancelClose = true;
+		private void SettingsForm_FormClosing(object sender, FormClosingEventArgs e) {
+			if (cancelClose)
+				e.Cancel = true;
+			HideForm();
+		}
 		private void Exit_Click(object sender, EventArgs e) {
 			NIcon.Visible = false;
+			cancelClose = false;
 			Application.Exit();
 		}
 	}
