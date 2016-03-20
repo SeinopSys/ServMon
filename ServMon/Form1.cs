@@ -72,8 +72,9 @@ namespace ServMon {
 			}
 
 			if (services.Count < 1) {
-				MessageBox.Show("No supported service","No supported service found. Please install Apache/PostgreSQL/MySQL and run ServMon again.", MessageBoxButtons.OK, MessageBoxIcon.Error);
-				Application.Exit();
+				MessageBox.Show("No supported service found. Please install Apache/PostgreSQL/MySQL and run ServMon again.", "No supported service", MessageBoxButtons.OK, MessageBoxIcon.Error);
+				NIcon.Visible = false;
+				Environment.Exit(0);
 			}
 
 			if (lServ.Length > 0) {
