@@ -1,4 +1,4 @@
-<p align="center"><img src="https://raw.githubusercontent.com/DJDavid98/ServMon/master/ServMon/Resources/logo.ico" alt="ServMon logo" height="150"></p>
+<p align="center"><img src="https://git.djdavid98.hu/SeinopSys/ServMon/raw/master/ServMon/Resources/logo.ico" alt="ServMon logo" height="150"></p>
 <h1 align="center">ServMon</h1>
 <p align="center">A simple, 2-side service monitor for Apache/PostgreSQL/MySQL</p>
 
