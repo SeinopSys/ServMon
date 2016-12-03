@@ -1,6 +1,6 @@
 <p align="center"><img src="https://git.djdavid98.hu/SeinopSys/ServMon/raw/master/ServMon/Resources/logo.ico" alt="ServMon logo" height="150"></p>
 <h1 align="center">ServMon</h1>
-<p align="center">A simple, 2-side service monitor for Apache/PostgreSQL/MySQL</p>
+<p align="center">A simple, 2-side service monitor for Windows</p>
 
 ## What's the point?
 
@@ -10,4 +10,4 @@ In addition to custom service tracking/controlling, the tray icon of the applica
 
 ### What if I only want to track 1 service?
 
-I did not test the application with only 1 service selected, but theoretically it *should* work. In this case, instead of 2 stripes the entire tray icon color will show the state of the tracked service.
+Just select the first, empty value on either side. In this case, instead of 2 stripes the entire tray icon color will show the state of the tracked service.

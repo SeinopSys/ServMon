@@ -16,6 +16,10 @@ namespace ServMon {
 			Application.SetCompatibleTextRenderingDefault(false);
 
 			FormInstance = new SettingsForm();
+			if (FormInstance.StartMinimized == false)
+				FormInstance.ShowForm();
+			FormInstance.Log.Log("Application started", Logger.Severity.Attention);
+			FormInstance.Started = true;
 			Application.Run();
 		}
 	}

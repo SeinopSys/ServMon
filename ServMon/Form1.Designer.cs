@@ -39,8 +39,13 @@
 			this.RServiceSel = new System.Windows.Forms.ComboBox();
 			this.BtnSave = new System.Windows.Forms.Button();
 			this.Exit = new System.Windows.Forms.Button();
+			this.LogOutput = new System.Windows.Forms.RichTextBox();
+			this.MinimizedCheckbox = new System.Windows.Forms.CheckBox();
+			this.TimeoutLabel = new System.Windows.Forms.Label();
+			this.TimeoutInput = new System.Windows.Forms.NumericUpDown();
 			this.LGroupBox.SuspendLayout();
 			this.RGroupBox.SuspendLayout();
+			((System.ComponentModel.ISupportInitialize)(this.TimeoutInput)).BeginInit();
 			this.SuspendLayout();
 			// 
 			// LGroupBox
@@ -135,6 +140,7 @@
 			this.LServiceSel.Name = "LServiceSel";
 			this.LServiceSel.Size = new System.Drawing.Size(259, 21);
 			this.LServiceSel.TabIndex = 0;
+			this.LServiceSel.SelectedIndexChanged += new System.EventHandler(this.LServiceSel_SelectedIndexChanged);
 			// 
 			// RGroupBox
 			// 
@@ -221,10 +227,11 @@
 			this.RServiceSel.Name = "RServiceSel";
 			this.RServiceSel.Size = new System.Drawing.Size(259, 21);
 			this.RServiceSel.TabIndex = 2;
+			this.RServiceSel.SelectedIndexChanged += new System.EventHandler(this.RServiceSel_SelectedIndexChanged);
 			// 
 			// BtnSave
 			// 
-			this.BtnSave.Location = new System.Drawing.Point(169, 112);
+			this.BtnSave.Location = new System.Drawing.Point(334, 112);
 			this.BtnSave.Name = "BtnSave";
 			this.BtnSave.Size = new System.Drawing.Size(116, 28);
 			this.BtnSave.TabIndex = 2;
@@ -234,7 +241,7 @@
 			// 
 			// Exit
 			// 
-			this.Exit.Location = new System.Drawing.Point(299, 112);
+			this.Exit.Location = new System.Drawing.Point(456, 112);
 			this.Exit.Name = "Exit";
 			this.Exit.Size = new System.Drawing.Size(116, 28);
 			this.Exit.TabIndex = 3;
@@ -242,12 +249,64 @@
 			this.Exit.UseVisualStyleBackColor = true;
 			this.Exit.Click += new System.EventHandler(this.Exit_Click);
 			// 
+			// LogOutput
+			// 
+			this.LogOutput.BackColor = System.Drawing.Color.Black;
+			this.LogOutput.BorderStyle = System.Windows.Forms.BorderStyle.None;
+			this.LogOutput.Font = new System.Drawing.Font("Courier New", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(238)));
+			this.LogOutput.Location = new System.Drawing.Point(12, 147);
+			this.LogOutput.Name = "LogOutput";
+			this.LogOutput.ReadOnly = true;
+			this.LogOutput.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
+			this.LogOutput.Size = new System.Drawing.Size(560, 142);
+			this.LogOutput.TabIndex = 4;
+			this.LogOutput.Text = "";
+			// 
+			// MinimizedCheckbox
+			// 
+			this.MinimizedCheckbox.AutoSize = true;
+			this.MinimizedCheckbox.Location = new System.Drawing.Point(232, 119);
+			this.MinimizedCheckbox.Name = "MinimizedCheckbox";
+			this.MinimizedCheckbox.Size = new System.Drawing.Size(96, 17);
+			this.MinimizedCheckbox.TabIndex = 5;
+			this.MinimizedCheckbox.Text = "Start minimized";
+			this.MinimizedCheckbox.UseVisualStyleBackColor = true;
+			this.MinimizedCheckbox.CheckedChanged += new System.EventHandler(this.MinimizedCheckbox_CheckedChanged);
+			// 
+			// TimeoutLabel
+			// 
+			this.TimeoutLabel.AutoSize = true;
+			this.TimeoutLabel.Cursor = System.Windows.Forms.Cursors.Help;
+			this.TimeoutLabel.Location = new System.Drawing.Point(12, 120);
+			this.TimeoutLabel.Name = "TimeoutLabel";
+			this.TimeoutLabel.Size = new System.Drawing.Size(115, 13);
+			this.TimeoutLabel.TabIndex = 6;
+			this.TimeoutLabel.Text = "Service action timeout:";
+			// 
+			// TimeoutInput
+			// 
+			this.TimeoutInput.Location = new System.Drawing.Point(133, 118);
+			this.TimeoutInput.Maximum = new decimal(new int[] {
+            60,
+            0,
+            0,
+            0});
+			this.TimeoutInput.Name = "TimeoutInput";
+			this.TimeoutInput.Size = new System.Drawing.Size(45, 20);
+			this.TimeoutInput.TabIndex = 7;
+			this.TimeoutInput.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+			this.TimeoutInput.ValueChanged += new System.EventHandler(this.TimeoutInput_ValueChanged);
+			// 
 			// SettingsForm
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
 			this.BackColor = System.Drawing.SystemColors.Control;
-			this.ClientSize = new System.Drawing.Size(584, 152);
+			this.ClientSize = new System.Drawing.Size(584, 301);
+			this.Controls.Add(this.TimeoutInput);
+			this.Controls.Add(this.TimeoutLabel);
+			this.Controls.Add(this.MinimizedCheckbox);
+			this.Controls.Add(this.LogOutput);
 			this.Controls.Add(this.Exit);
 			this.Controls.Add(this.BtnSave);
 			this.Controls.Add(this.RGroupBox);
@@ -259,11 +318,14 @@
 			this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
 			this.Text = "ServMon";
 			this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SettingsForm_FormClosing);
+			this.Load += new System.EventHandler(this.SettingsForm_Load);
 			this.LGroupBox.ResumeLayout(false);
 			this.LGroupBox.PerformLayout();
 			this.RGroupBox.ResumeLayout(false);
 			this.RGroupBox.PerformLayout();
+			((System.ComponentModel.ISupportInitialize)(this.TimeoutInput)).EndInit();
 			this.ResumeLayout(false);
+			this.PerformLayout();
 
 		}
 
@@ -285,6 +347,10 @@
 		private System.Windows.Forms.Button Exit;
 		private System.Windows.Forms.CheckBox LAutoStart;
 		private System.Windows.Forms.CheckBox RAutoStart;
+		private System.Windows.Forms.RichTextBox LogOutput;
+		private System.Windows.Forms.CheckBox MinimizedCheckbox;
+		private System.Windows.Forms.Label TimeoutLabel;
+		private System.Windows.Forms.NumericUpDown TimeoutInput;
 	}
 }
 

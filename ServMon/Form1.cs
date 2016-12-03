@@ -9,119 +9,159 @@ using System.IO;
 using System.Drawing;
 using System.Linq;
 using System.ComponentModel;
+using ServMon.Properties;
 
 namespace ServMon {
 	public partial class SettingsForm : Form {
-		private static Settings AppSettings = new Settings();
-		private static List<ServiceController> services;
-		private static string lServ, rServ, lAuto, rAuto;
-		private static bool singleService, leftSide;
-		private static char side;
+		private Settings _appSettings;
+		public Logger Log;
+		public bool StartMinimized, Started = false;
+		public int TimeoutSeconds;
+		private static List<ServiceController> _services;
+		private static string _lServ, _rServ, _lAuto, _rAuto;
+		private static bool _singleService, _singleServiceOnLeftSide;
+		private static char _singleServiceSide;
 		public static NotifyIcon NIcon = new NotifyIcon();
 
-		private static Dictionary<char, string> serviceNames = new Dictionary<char, string>();
-		private static Dictionary<char, ServiceManager> serviceMgrs = new Dictionary<char, ServiceManager>();
+		private static Dictionary<char, string> _serviceNames = new Dictionary<char, string>();
+		private static Dictionary<char, ServiceManager> _serviceMgrs = new Dictionary<char, ServiceManager>();
 
 		public SettingsForm() {
 			InitializeComponent();
 
-			var CtxMenu = new ContextMenu();
-			CtxMenu.MenuItems.Add("ServMon");
-			CtxMenu.MenuItems[0].Enabled = false;
-			CtxMenu.MenuItems.Add("-");
-			CtxMenu.MenuItems.Add("Show settings", new EventHandler(NIcon_MouseClick));
-			CtxMenu.MenuItems[2].DefaultItem = true;
-			CtxMenu.MenuItems.Add("Exit ServMon", new EventHandler(Exit_Click));
+			_appSettings = new Settings(this);
+			Log = new Logger(this);
 
-			NIcon.ContextMenu = CtxMenu;
-			NIcon.Icon = Properties.Resources.logo;
+			var ctxMenu = new ContextMenu();
+			ctxMenu.MenuItems.Add("ServMon");
+			ctxMenu.MenuItems[0].Enabled = false;
+			ctxMenu.MenuItems.Add("-");
+			ctxMenu.MenuItems.Add("Show settings", NIcon_MouseClick);
+			ctxMenu.MenuItems[2].DefaultItem = true;
+			ctxMenu.MenuItems.Add("Exit ServMon", Exit_Click);
+
+			NIcon.ContextMenu = ctxMenu;
+			NIcon.Icon = Resources.logo;
 			NIcon.Visible = true;
 			NIcon.MouseClick += NIcon_MouseClick;
 			NIcon.MouseDoubleClick += NIcon_MouseClick;
 
-			this.Icon = NIcon.Icon;
+			Icon = NIcon.Icon;
 
 			GetServiceList();
 			SetServices();
 
-			lAuto = AppSettings.Get("leftServiceAutostart");
-			rAuto = AppSettings.Get("rightServiceAutostart");
+			_lAuto = _appSettings.Get("leftServiceAutostart");
+			_rAuto = _appSettings.Get("rightServiceAutostart");
 
-			if (lAuto == "true") {
+			Log.Log("Processing autostart entries...");
+			if (_lAuto == "true") {
 				LAutoStart.Checked = true;
-				StartService('l');
+				if (_serviceMgrs['l'].StatusColor() == StatusColors.Running)
+					Log.Log(_serviceNames['l'] + " is already running.", Logger.Severity.Success);
+				else {
+					StartService('l', true);
+					Log.Log("Auto-starting " + _serviceNames['l'] + " service...");
+				}
 			}
-			if (rAuto == "true") {
+			if (_rAuto == "true") {
 				RAutoStart.Checked = true;
-				StartService('r');
+				if (_serviceMgrs['r'].StatusColor() == StatusColors.Running)
+					Log.Log(_serviceNames['r'] + " is already running.", Logger.Severity.Success);
+				else {
+					StartService('r', true);
+					Log.Log("Auto-starting " + _serviceNames['r'] + " service...");
+				}
 			}
+
+			StartMinimized = _appSettings.Get("startMinimized") != "false";
+			MinimizedCheckbox.Checked = StartMinimized;
+
+			TimeoutSeconds = _appSettings.Get("timeoutSeconds").Length > 0
+				? int.Parse(_appSettings.Get("timeoutSeconds"))
+				: 15;
+			TimeoutInput.Value = TimeoutSeconds;
 		}
 		private void GetServiceList() {
-			lServ = AppSettings.Get("leftServiceName");
-			rServ = AppSettings.Get("rightServiceName");
+			_lServ = _appSettings.Get("leftServiceName");
+			_rServ = _appSettings.Get("rightServiceName");
 
 			ServiceController[] servicesArray = ServiceController.GetServices();
-			services = new List<ServiceController>();
+			_services = new List<ServiceController>();
+			LServiceSel.Items.Add("");
+			RServiceSel.Items.Add("");
 			foreach (ServiceController s in servicesArray) {
 				var serviceName = s.ServiceName;
-				if (!Regex.IsMatch(serviceName, @"(apache|postgres|mysql)", RegexOptions.IgnoreCase))
+				if (!Regex.IsMatch(serviceName, @"(apache|postgres|mysql|elasticsearch|redis|memcached)", RegexOptions.IgnoreCase))
 					continue;
 				LServiceSel.Items.Add(serviceName);
 				RServiceSel.Items.Add(serviceName);
-				services.Add(s);
+				_services.Add(s);
 			}
 
-			if (services.Count < 1) {
-				MessageBox.Show("No supported service found. Please install Apache/PostgreSQL/MySQL and run ServMon again.", "No supported service", MessageBoxButtons.OK, MessageBoxIcon.Error);
+			if (_services.Count < 1) {
+				MessageBox.Show("No supported service found. Please install Apache/PostgreSQL/MySQL/ElasticSearch and run ServMon again.", "No supported service", MessageBoxButtons.OK, MessageBoxIcon.Error);
 				NIcon.Visible = false;
 				Environment.Exit(0);
 			}
 
-			if (lServ.Length > 0) {
-				var leftService = services.FirstOrDefault(x => x.ServiceName == lServ);
+			if (_lServ.Length > 0) {
+				var leftService = _services.FirstOrDefault(x => x.ServiceName == _lServ);
 				if (leftService != null)
 					LServiceSel.Text = leftService.ServiceName;
-				else AppSettings.Set("leftServiceName", "");
+				else _appSettings.Set("leftServiceName", "");
 			}
-			if (rServ.Length > 0) {
-				var rightService = services.FirstOrDefault(x => x.ServiceName == rServ);
+			if (_rServ.Length > 0) {
+				var rightService = _services.FirstOrDefault(x => x.ServiceName == _rServ);
 				if (rightService != null)
 					RServiceSel.Text = rightService.ServiceName;
-				else AppSettings.Set("rightServiceName", "");
+				else _appSettings.Set("rightServiceName", "");
 			}
-			if (lServ.Length + rServ.Length == 0) {
-				var leftService = services[0];
-				lServ = leftService.ServiceName;
-				LServiceSel.Text = lServ;
-				AppSettings.Set("leftServiceName", lServ);
+			if (_lServ.Length + _rServ.Length == 0) {
+				var leftService = _services[0];
+				_lServ = leftService.ServiceName;
+				LServiceSel.Text = _lServ;
+				_appSettings.Set("leftServiceName", _lServ);
 
-				if (services.Count > 1) {
-					var rightService = services[1];
-					rServ = rightService.ServiceName;
-					RServiceSel.Text = rServ;
-					AppSettings.Set("rightServiceName", rServ);
+				if (_services.Count > 1) {
+					var rightService = _services[1];
+					_rServ = rightService.ServiceName;
+					RServiceSel.Text = _rServ;
+					_appSettings.Set("rightServiceName", _rServ);
 				}
-
-				AppSettings.Save();
 			}
 		}
-		private void SetServices() {
-			singleService = lServ.Length == 0 || rServ.Length == 0;
-			if (singleService) {
-				leftSide = lServ.Length != 0;
-				side = leftSide ? 'l' : 'r';
-			}
+		private void SetServices(){
+			bool wasSingleService = _singleService;
+			_singleService = _lServ.Length == 0 || _rServ.Length == 0;
+			if (_singleService) {
+				_singleServiceOnLeftSide = _lServ.Length != 0;
+				string
+					singleServiceSideStr = _singleServiceOnLeftSide ? "left" : "right",
+					oppositeServiceSideStr = _singleServiceOnLeftSide ? "right" : "left";
+				_singleServiceSide = singleServiceSideStr[0];
 
-			if (singleService) {
-				serviceNames[side] = leftSide ? lServ : rServ;
-				serviceMgrs[side] = new ServiceManager(serviceNames[side], this);
+				_serviceNames[_singleServiceSide] = _singleServiceOnLeftSide ? _lServ : _rServ;
+				_serviceMgrs[_singleServiceSide] = new ServiceManager(_serviceNames[_singleServiceSide], this);
+
+				_appSettings.Set(singleServiceSideStr + "ServiceName", _serviceNames[_singleServiceSide]);
+				_appSettings.Set(oppositeServiceSideStr + "ServiceName", "");
+
+				if (!wasSingleService && Started)
+					Log.Log("Switched to single service mode");
 			}
 			else {
-				serviceNames['l'] = lServ;
-				serviceNames['r'] = rServ;
+				_serviceNames['l'] = _lServ;
+				_serviceNames['r'] = _rServ;
 
-				serviceMgrs['l'] = new ServiceManager(serviceNames['l'], this);
-				serviceMgrs['r'] = new ServiceManager(serviceNames['r'], this);
+				_serviceMgrs['l'] = new ServiceManager(_serviceNames['l'], this);
+				_serviceMgrs['r'] = new ServiceManager(_serviceNames['r'], this);
+
+				_appSettings.Set("leftServiceName", _serviceNames['l']);
+				_appSettings.Set("rightServiceName", _serviceNames['r']);
+
+				if (wasSingleService && Started)
+					Log.Log("Switched to dual service mode");
 			}
 			UpdateEverything();
 		}
@@ -130,44 +170,49 @@ namespace ServMon {
 			UpdateButtons();
 		}
 		private void UpdateIcon() {
-			if (singleService) {
-				var color = serviceMgrs[side].StatusColor();
-				NIcon.Icon = (Icon) Properties.Resources.ResourceManager.GetObject(color + color);
+			if (_singleService) {
+				var color = _serviceMgrs[_singleServiceSide].StatusColor();
+				NIcon.Icon = (Icon) Resources.ResourceManager.GetObject(color + color);
 			}
-			else {
-				string[] name = new string[] { serviceMgrs['l'].StatusColor(), serviceMgrs['r'].StatusColor() };
-				NIcon.Icon = (Icon) Properties.Resources.ResourceManager.GetObject(String.Join("",name));
-			}
+			else NIcon.Icon = (Icon) Resources.ResourceManager.GetObject(_serviceMgrs['l'].StatusColor() + _serviceMgrs['r'].StatusColor());
+
+			Icon = NIcon.Icon;
 		}
-		private void UpdateButtons() {
-			foreach (var updateSide in new string[]{"l","r"}){
-				if (!serviceNames.ContainsKey(updateSide[0]))
-					continue;
+		private void UpdateButtons(){
+			foreach (var updateSide in new[] { 'l', 'r' }) {
+				var updateSideUpper = updateSide.ToString().ToUpper();
+				Button btnStart = (Button) Controls.Find(updateSideUpper + "BtnStart", true).First();
+				Button btnStop = (Button) Controls.Find(updateSideUpper + "BtnStop", true).First();
+				Button btnRestart = (Button) Controls.Find(updateSideUpper + "BtnRestart", true).First();
 
-				var updateSideUpper = updateSide.ToUpper();
-				Button BtnStart = (Button) this.Controls.Find(updateSideUpper + "BtnStart", true).First();
-				Button BtnStop = (Button) this.Controls.Find(updateSideUpper + "BtnStop", true).First();
-				Button BtnRestart = (Button) this.Controls.Find(updateSideUpper + "BtnRestart", true).First();
+				bool foceDisable = _singleService && ((_singleServiceOnLeftSide && updateSide != 'l') || (!_singleServiceOnLeftSide && updateSide == 'l'));
 
-				string value = serviceMgrs[updateSide[0]].StatusColor();
+				string value = _serviceNames.ContainsKey(updateSide) && !foceDisable
+					? _serviceMgrs[updateSide].StatusColor()
+					: StatusColors.Waiting;
+
 				switch (value) {
 					case StatusColors.Waiting:
-						BtnRestart.Enabled =
-						BtnStart.Enabled =
-						BtnStop.Enabled = false;
-						break;
+						btnRestart.Enabled =
+						btnStart.Enabled =
+						btnStop.Enabled = false;
+					break;
 					case StatusColors.Running:
-						BtnStart.Text = "Running";
-						BtnStart.Enabled = !(BtnRestart.Enabled = BtnStop.Enabled = true);
-						break;
+						btnStart.Text = "Running";
+						btnRestart.Enabled = true;
+						btnStop.Enabled = true;
+						btnStart.Enabled = false;
+					break;
 					case StatusColors.Stopped:
-						BtnStart.Text = "Start";
-						BtnStart.Enabled = !(BtnRestart.Enabled = BtnStop.Enabled = false);
-						break;
+						btnStart.Text = "Start";
+						btnRestart.Enabled = false;
+						btnStop.Enabled = false;
+						btnStart.Enabled = true;
+					break;
 				}
 			}
 		}
-		private static void ShowForm() {
+		public void ShowForm() {
 			if (!Program.FormInstance.Visible)
 				Program.FormInstance.Show();
 			Program.FormInstance.Activate();
@@ -175,29 +220,26 @@ namespace ServMon {
 		private static void HideForm() {
 			Program.FormInstance.Hide();
 		}
-		private void StartService(char side) {
-			if (serviceMgrs[side].StatusColor() != StatusColors.Stopped)
+		private void StartService(char side, bool autoStart = false) {
+			if (_serviceMgrs[side].StatusColor() != StatusColors.Stopped)
 				return;
-			serviceMgrs[side].Start();
+			_serviceMgrs[side].Start(autoStart);
 		}
 		private void StopService(char side) {
-			if (serviceMgrs[side].StatusColor() != StatusColors.Running)
+			if (_serviceMgrs[side].StatusColor() != StatusColors.Running)
 				return;
-			serviceMgrs[side].Stop();
+			_serviceMgrs[side].Stop();
 		}
 		private void RestartService(char side) {
-			if (serviceMgrs[side].StatusColor() != StatusColors.Running)
+			if (_serviceMgrs[side].StatusColor() != StatusColors.Running)
 				return;
-			serviceMgrs[side].Restart();
+			_serviceMgrs[side].Restart();
 		}
 
 		private void BtnSave_Click(object sender, EventArgs e) {
-			AppSettings.Save();
+			_appSettings.Save();
 		}
-		private static void NIcon_MouseClick(object sender, EventArgs e) {
-			ShowForm();
-		}
-		private static void NIcon_MouseClick(object sender, MouseEventArgs e) {
+		private void NIcon_MouseClick(object sender, EventArgs e) {
 			ShowForm();
 		}
 		private void LBtnStart_Click(object sender, EventArgs e) {
@@ -219,150 +261,260 @@ namespace ServMon {
 			RestartService('r');
 		}
 		private void LAutoStart_CheckedChanged(object sender, EventArgs e) {
-			lAuto = LAutoStart.Checked ? "true" : "";
-			AppSettings.Set("leftServiceAutostart", lAuto);
+			_lAuto = LAutoStart.Checked ? "true" : "false";
+			_appSettings.Set("leftServiceAutostart", _lAuto);
 		}
 		private void RAutoStart_CheckedChanged(object sender, EventArgs e) {
-			rAuto = RAutoStart.Checked ? "true" : "";
-			AppSettings.Set("rightServiceAutostart", rAuto);
+			_rAuto = RAutoStart.Checked ? "true" : "false";
+			_appSettings.Set("rightServiceAutostart", _rAuto);
 		}
-		private bool cancelClose = true;
+		private void LServiceSel_SelectedIndexChanged(object sender, EventArgs e){
+			_lServ = LServiceSel.Text;
+			SetServices();
+		}
+		private void RServiceSel_SelectedIndexChanged(object sender, EventArgs e) {
+			_rServ = RServiceSel.Text;
+			SetServices();
+		}
+
+		private void SettingsForm_Load(object sender, EventArgs e){
+			var labelTip = new ToolTip();
+			string text = "How long service tasks are allowed to run (in seconds) before being aborted";
+			labelTip.SetToolTip(TimeoutLabel, text);
+			labelTip.SetToolTip(TimeoutInput, text);
+		}
+
+		private void TimeoutInput_ValueChanged(object sender, EventArgs e){
+			TimeoutSeconds = Convert.ToInt32(TimeoutInput.Value);
+			_appSettings.Set("timeoutSeconds", TimeoutSeconds.ToString());
+		}
+		private void MinimizedCheckbox_CheckedChanged(object sender, EventArgs e) {
+			_appSettings.Set("startMinimized", ((CheckBox) sender).Checked ? "true" : "false");
+		}
+		private bool _cancelClose = true;
 		private void SettingsForm_FormClosing(object sender, FormClosingEventArgs e) {
-			if (cancelClose)
+			if (_cancelClose)
 				e.Cancel = true;
 			HideForm();
 		}
 		private void Exit_Click(object sender, EventArgs e) {
 			NIcon.Visible = false;
-			cancelClose = false;
+			_cancelClose = false;
 			Application.Exit();
 		}
 	}
-	struct StatusColors {
+
+	internal struct StatusColors {
 		public const string
 			Stopped = "r",
 			Running = "g",
 			Waiting = "y";
-		private static Dictionary<ServiceControllerStatus, string> StatusMeaning = new Dictionary<ServiceControllerStatus, string>() {
-			{ ServiceControllerStatus.ContinuePending, StatusColors.Waiting },
-			{ ServiceControllerStatus.PausePending, StatusColors.Waiting },
-			{ ServiceControllerStatus.StartPending, StatusColors.Waiting },
-			{ ServiceControllerStatus.StopPending, StatusColors.Waiting },
-			{  ServiceControllerStatus.Paused, StatusColors.Stopped },
-			{ ServiceControllerStatus.Stopped, StatusColors.Stopped },
-			{ ServiceControllerStatus.Running, StatusColors.Running },
+		private static Dictionary<ServiceControllerStatus, string> _statusMeaning = new Dictionary<ServiceControllerStatus, string>() {
+			{ ServiceControllerStatus.ContinuePending, Waiting },
+			{ ServiceControllerStatus.PausePending, Waiting },
+			{ ServiceControllerStatus.StartPending, Waiting },
+			{ ServiceControllerStatus.StopPending, Waiting },
+			{  ServiceControllerStatus.Paused, Stopped },
+			{ ServiceControllerStatus.Stopped, Stopped },
+			{ ServiceControllerStatus.Running, Running },
 		};
 		public static string ForStatus(ServiceControllerStatus s) {
-			return StatusMeaning[s];
+			return _statusMeaning[s];
 		}
 	}
-	class ServiceManager {
-		ServiceController service;
-		SettingsForm form;
-		BackgroundWorker starter, stopper, restarter;
-		int timeoutSeconds = 7;
-		bool busy = false;
+
+	internal class ServiceManager {
+		private ServiceController _service;
+		private SettingsForm _form;
+		private BackgroundWorker _starter, _stopper, _restarter;
+		private bool _busy;
 
 		public ServiceManager(string serviceName, SettingsForm targetform) {
-			service = new ServiceController(serviceName);
-			form = targetform;
+			_service = new ServiceController(serviceName);
+			_form = targetform;
 
-			starter = new BackgroundWorker();
-			starter.WorkerSupportsCancellation = false;
-			starter.WorkerReportsProgress = false;
-			starter.DoWork += new DoWorkEventHandler(StartBeginHandler);
-			starter.RunWorkerCompleted += new RunWorkerCompletedEventHandler(WorkerEndHandler);
+			_starter = new BackgroundWorker {
+				WorkerSupportsCancellation = false,
+				WorkerReportsProgress = false
+			};
+			_starter.DoWork += StartBeginHandler;
+			_starter.RunWorkerCompleted += StartEndHandler;
 
-			stopper = new BackgroundWorker();
-			stopper.WorkerSupportsCancellation = false;
-			stopper.WorkerReportsProgress = false;
-			stopper.DoWork += new DoWorkEventHandler(StopBeginHandler);
-			stopper.RunWorkerCompleted += new RunWorkerCompletedEventHandler(WorkerEndHandler);
+			_stopper = new BackgroundWorker {
+				WorkerSupportsCancellation = false,
+				WorkerReportsProgress = false
+			};
+			_stopper.DoWork += StopBeginHandler;
+			_stopper.RunWorkerCompleted += StopEndHandler;
 
-			restarter = new BackgroundWorker();
-			restarter.WorkerSupportsCancellation = false;
-			restarter.WorkerReportsProgress = false;
-			restarter.DoWork += new DoWorkEventHandler(RestartBeginHandler);
-			restarter.RunWorkerCompleted += new RunWorkerCompletedEventHandler(WorkerEndHandler);
+			_restarter = new BackgroundWorker {
+				WorkerSupportsCancellation = false,
+				WorkerReportsProgress = false
+			};
+			_restarter.DoWork += RestartBeginHandler;
+			_restarter.RunWorkerCompleted += RestartEndHandler;
 		}
 
 		public string StatusColor() {
-			return busy ? StatusColors.Waiting : StatusColors.ForStatus(service.Status);
+			return _busy ? StatusColors.Waiting : StatusColors.ForStatus(_service.Status);
 		}
 		public void BeBusy() {
-			busy = true;
-			form.UpdateEverything();
+			_busy = true;
+			_form.UpdateEverything();
 		}
 
-		public void Start() {
+		public void Start(bool autoStart = false) {
+			if (!autoStart)
+				_form.Log.Log("Starting service "+_service.ServiceName+"...", Logger.Severity.Warn);
 			BeBusy();
-			starter.RunWorkerAsync();
+			_starter.RunWorkerAsync();
 		}
 		private void StartBeginHandler(object sender, DoWorkEventArgs e) {
-			service.Start();
-			var timeout = TimeSpan.FromSeconds(timeoutSeconds);
-			service.WaitForStatus(ServiceControllerStatus.Running, timeout);
+			_service.Start();
+			var timeout = TimeSpan.FromSeconds(_form.TimeoutSeconds);
+			_service.WaitForStatus(ServiceControllerStatus.Running, timeout);
+		}
+		private void StartEndHandler(object sender, RunWorkerCompletedEventArgs e) {
+			if (_service.Status != ServiceControllerStatus.Running)
+				_form.Log.Log("Starting service " + _service.ServiceName + " failed.", Logger.Severity.Error);
+			else _form.Log.Log("Service " + _service.ServiceName + " started.", Logger.Severity.Success);
+
+			WorkerEndHandler(sender, e);
 		}
 
 		public void Stop() {
+			_form.Log.Log("Stopping service " + _service.ServiceName + "...", Logger.Severity.Warn);
 			BeBusy();
-			stopper.RunWorkerAsync();
+			_stopper.RunWorkerAsync();
 		}
 		private void StopBeginHandler(object sender, DoWorkEventArgs e) {
-			service.Stop();
-			var timeout = TimeSpan.FromSeconds(timeoutSeconds);
-			service.WaitForStatus(ServiceControllerStatus.Stopped, timeout);
+			_service.Stop();
+			var timeout = TimeSpan.FromSeconds(_form.TimeoutSeconds);
+			_service.WaitForStatus(ServiceControllerStatus.Stopped, timeout);
+		}
+		private void StopEndHandler(object sender, RunWorkerCompletedEventArgs e) {
+			if (_service.Status != ServiceControllerStatus.Stopped)
+				_form.Log.Log("Stopping service " + _service.ServiceName + " failed.", Logger.Severity.Error);
+			else _form.Log.Log("Service " + _service.ServiceName + " stopped.", Logger.Severity.Success);
+
+			WorkerEndHandler(sender, e);
 		}
 
 		public void Restart() {
+			_form.Log.Log("Restarting service " + _service.ServiceName + "...", Logger.Severity.Warn);
 			BeBusy();
-			restarter.RunWorkerAsync();
+			_restarter.RunWorkerAsync();
 		}
-		private void RestartBeginHandler(object sender, DoWorkEventArgs e) {
-			service.Stop();
-			TimeSpan timeout = TimeSpan.FromSeconds(timeoutSeconds);
-			service.WaitForStatus(ServiceControllerStatus.Stopped, timeout);
+		private void RestartBeginHandler(object sender, DoWorkEventArgs e){
+			StopBeginHandler(sender, e);
 
-			service.Start();
-			timeout = TimeSpan.FromSeconds(timeoutSeconds);
-			service.WaitForStatus(ServiceControllerStatus.Running, timeout);
+			StartBeginHandler(sender, e);
+		}
+		private void RestartEndHandler(object sender, RunWorkerCompletedEventArgs e) {
+			if (_service.Status != ServiceControllerStatus.Running)
+				_form.Log.Log("Restarting service " + _service.ServiceName + " failed.", Logger.Severity.Error);
+			else
+				_form.Log.Log("Service " + _service.ServiceName + " restarted.", Logger.Severity.Success);
+
+			WorkerEndHandler(sender, e);
 		}
 
 		private void WorkerEndHandler(object sender, RunWorkerCompletedEventArgs e) {
-			busy = false;
-			form.UpdateEverything();
+			_busy = false;
+			_form.UpdateEverything();
 		}
 	}
-	class Settings {
-		public string fileName = "ServMon.config.json", savePath;
-		public Dictionary<string, string> config;
 
-		public Settings() {
-			this.savePath = "./" + fileName;
+	public class Logger {
+		private RichTextBox _logOutput;
+
+		public struct Severity {
+			public const int
+				Info = 0,
+				Error = 1,
+				Warn = 2,
+				Success = 3,
+				Attention = 4;
+		}
+
+		public Dictionary<int, Color> SeverityColors = new Dictionary<int, Color> {
+			{0, Color.DeepSkyBlue},
+			{1, Color.Red},
+			{2, Color.Orange},
+			{3, Color.Lime},
+			{4, Color.Yellow},
+		};
+
+		public Logger(SettingsForm form){
+			_logOutput = (RichTextBox) form.Controls.Find("LogOutput", true).First();
+		}
+
+		private void WriteInColor(string text, Color color) {
+			_logOutput.SelectionStart = _logOutput.TextLength;
+			_logOutput.SelectionLength = 0;
+
+			_logOutput.SelectionColor = color;
+			_logOutput.AppendText(text);
+			_logOutput.SelectionColor = _logOutput.ForeColor;
+		}
+
+		public void Log(string message, int severity = Severity.Info) {
+			WriteInColor(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")+' ', Color.White);
+			WriteInColor(message + '\n', SeverityColors[severity]);
+			_logOutput.SelectionStart = _logOutput.Text.Length;
+			_logOutput.ScrollToCaret();
+		}
+	}
+
+	internal class Settings {
+		public string FileName = "ServMon.config.json", SavePath;
+		private Dictionary<string, string> _config;
+		private SettingsForm _form;
+		private Button _btnSave;
+
+		public Settings(SettingsForm form) {
+			SavePath = "./" + FileName;
 			string configFile = "{}";
 			try {
-				var sr = new StreamReader(savePath, Encoding.UTF8);
+				var sr = new StreamReader(SavePath, Encoding.UTF8);
 				configFile = sr.ReadToEnd();
 				sr.Close();
 			}
-			catch (Exception) { };
-			config = JsonConvert.DeserializeObject<Dictionary<string, string>>(configFile);
+			catch (Exception){
+				// ignored
+			}
+
+			try {
+				_config = JsonConvert.DeserializeObject<Dictionary<string, string>>(configFile);
+			}
+			catch (JsonReaderException) {
+				File.Delete(SavePath);
+				_config = new Dictionary<string, string>();
+			}
+			_form = form;
+			_btnSave = (Button) _form.Controls.Find("BtnSave", true).First();
 		}
 
 		public string Get(string option) {
-			return config.ContainsKey(option) ? config[option] : "";
+			return _config.ContainsKey(option) ? _config[option] : "";
 		}
 
 		public void Set(string option, string value) {
-			config[option] = value;
+			_config[option] = value;
 		}
 
 		public void Save() {
-			var fs = new FileStream(savePath, FileMode.OpenOrCreate);
+			_btnSave.Enabled = false;
+			var fs = new FileStream(SavePath, FileMode.Create);
 			var sw = new StreamWriter(fs, Encoding.UTF8);
-			sw.WriteLine(JsonConvert.SerializeObject(config, Formatting.Indented));
+			sw.Flush();
+			var json = JsonConvert.SerializeObject(_config, Formatting.Indented);
+			sw.Write(json);
 			sw.Close();
 			fs.Close();
+
+			_btnSave.Enabled = true;
+			_form.Log.Log("Settings have been saved", Logger.Severity.Success);
 		}
 	}
 }
