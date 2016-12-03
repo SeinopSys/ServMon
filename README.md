@@ -1,6 +1,8 @@
-<p align="center"><img src="https://git.djdavid98.hu/SeinopSys/ServMon/raw/master/ServMon/Resources/logo.ico" alt="ServMon logo" height="150"></p>
+<p align="center"><img src="https://github.com/SeinopSys/ServMon/raw/master/Screenshot.png" alt="ServMon screenshot" height="256"></p>
 <h1 align="center">ServMon</h1>
 <p align="center">A simple, 2-side service monitor for Windows</p>
+
+<h4 align="center">Download: <a href="https://github.com/SeinopSys/ServMon/raw/master/publish/ServMon-x86.exe">32-bit</a> / <a href="https://github.com/SeinopSys/ServMon/raw/master/publish/ServMon-x64.exe">64-bit</a></h4>
 
 ## What's the point?
 
