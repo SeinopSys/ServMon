@@ -88,7 +88,7 @@ namespace ServMon {
 			RServiceSel.Items.Add("");
 			foreach (ServiceController s in servicesArray) {
 				var serviceName = s.ServiceName;
-				if (!Regex.IsMatch(serviceName, @"(apache|postgres|mysql|elasticsearch|redis|memcached)", RegexOptions.IgnoreCase))
+				if (!Regex.IsMatch(serviceName, @"(apache|postgres|mysql|elasticsearch|redis|memcached|nginx)", RegexOptions.IgnoreCase))
 					continue;
 				LServiceSel.Items.Add(serviceName);
 				RServiceSel.Items.Add(serviceName);
